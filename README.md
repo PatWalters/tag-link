@@ -1,5 +1,8 @@
+
+
 Tag and link are two utilities for molecular design from the command line
 
+```
 Usage: tag.py --in INFILE_NAME --out OUTFILE_NAME --smarts SMARTS --tag TAG
 
 --in INFILE_NAME input SMILES file
@@ -17,3 +20,4 @@ Usage: link.py --file1 FILE1 --link1 LINK1 --file2 FILE2 --link2 LINK2 --out OUT
 --out OUTFILE output file
 
 
+```
