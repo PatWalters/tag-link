@@ -56,7 +56,7 @@ def replace_fragment(mol,query,atomic_num):
 
 
 def main(arg_string):
-    cmd_input = docopt(__doc__)
+    cmd_input = docopt(arg_string)
     input_file = cmd_input.get("--in")
     output_file = cmd_input.get("--out")
     smarts = cmd_input.get("--smarts")
