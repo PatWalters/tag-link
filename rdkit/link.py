@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 
-"""Usage: link.py --file1 FILE1 --link1 LINK1 --file2 FILE2 --link2 LINK2 --out OUTFILE
+"""Usage: link.py --file1 FILE1 --link1 LINK1 --file2 FILE2 --link2 LINK2 --out OUTFILE [--align TEMPLATE]
 
 --file1 FILE1 first file to be linked
 --link1 LINK1 linking SMARTS in file1
 --file2 FILE2 second file to be linked
 --link2 LINK2 linking SMARTS in file2
 --out OUTFILE output file
+--template TEMPLATE template molfile used to align structures
 """
 
 import sys
 import os
 from rdkit import Chem
+from rdkit.Chem import AllChem
 from docopt import docopt
 from tqdm import tqdm
 
@@ -113,6 +115,9 @@ def main(cmd_string):
     link1 = cmd_input.get("--link1")
     link2 = cmd_input.get("--link2")
     writer = get_writer(cmd_input.get("--out"))
+    template_file_name = cmd_input.get("--template")
+    if template_file_name:
+        template_mol = Chem.MolFromMolFile(template_file_name)
 
     suppl_1 = get_supplier(file_name1)
     suppl_2 = get_supplier(file_name2)
@@ -129,6 +134,10 @@ def main(cmd_string):
             name2 = m2.GetProp("_Name")
             linked_mol = link_molecules(m1, query1, m2, query2)
             Chem.SanitizeMol(linked_mol)
+            if template_file_name:
+                AllChem.GenerateDepictionMatching2DStructure(linked_mol,template_mol)
+            else:
+                AllChem.Compute2DCoords(linked_mol)
             linked_mol.SetProp("_Name",name1+"_"+name2)
             writer.write(linked_mol)
 

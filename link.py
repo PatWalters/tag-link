@@ -54,11 +54,9 @@ def link_molecules(mol1, type1, mol2, type2):
 
     for atm in mol1.GetAtoms():
         atm.SetMapIdx(0)
+    return mol1
 
-    return OECreateIsoSmiString(mol1)
-
-
-if __name__ == "__main__":
+def main(doc_string):
     input = docopt(__doc__)
     file_name1 = input.get("--file1")
     ifs1 = oemolistream(file_name1)
@@ -66,10 +64,8 @@ if __name__ == "__main__":
     ifs2 = oemolistream(file_name2)
     link1 = input.get("--link1")
     link2 = input.get("--link2")
-    ofs = open(input.get("--out"), "w")
+    ofs = oemolostream(input.get("--out"))
 
-    ifs1 = oemolistream(file_name1)
-    ifs2 = oemolistream(file_name2)
     mol_list1 = [OEGraphMol(x) for x in ifs1.GetOEGraphMols()]
     mol_list2 = [OEGraphMol(x) for x in ifs2.GetOEGraphMols()]
 
@@ -77,4 +73,13 @@ if __name__ == "__main__":
         for m2 in tqdm(mol_list2):
             n1 = OEGraphMol(m1)
             n2 = OEGraphMol(m2)
-            print(link_molecules(n1, link1, n2, link2), file=ofs)
+            new_mol = link_molecules(n1, link1, n2, link2)
+            new_title = m2.GetTitle()
+            if len(m1.GetTitle()):
+                new_title = m1.GetTitle() + "_" + m2.GetTitle()
+            new_mol.SetTitle(new_title)
+            OEWriteMolecule(ofs, new_mol)
+
+
+if __name__ == "__main__":
+    main(__doc__)

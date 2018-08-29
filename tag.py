@@ -50,7 +50,7 @@ def add_tag_atom(mol,tag):
     for atm in new_mol.GetAtoms():
         atm.SetMapIdx(0)
     adjust_hydrogens(new_mol)
-    return OECreateIsoSmiString(new_mol)
+    return new_mol
 
 
 def tag_molecule(mol, smarts, tag):
@@ -60,13 +60,13 @@ def tag_molecule(mol, smarts, tag):
     for atm in matches:
         if has_open_valence(atm):
             atm.SetMapIdx(1)
-            new_smi = add_tag_atom(mol, tag)
+            new_smi = OECreateIsoSmiString(add_tag_atom(mol, tag))
             if new_smi not in used:
                 used.add(new_smi)
     return list(used)
 
 
-if __name__ == "__main__":
+def main(arg_string):
     input = docopt(__doc__)
     input_file = input.get("--in")
     output_file = input.get("--out")
@@ -74,10 +74,16 @@ if __name__ == "__main__":
     tag = input.get("--tag")
 
     ifs = oemolistream(input_file)
-    ofs = open(output_file,"a")
+    ofs = open(output_file,"w")
 
     tagged_smiles = set()
     for in_mol in tqdm(ifs.GetOEGraphMols()):
-        [tagged_smiles.add(x) for x in tag_molecule(in_mol, smarts, tag)]
-    for smi in tagged_smiles:
-        print(smi,file=ofs)
+        for smi in tag_molecule(in_mol, smarts, tag):
+            if smi not in tagged_smiles:
+                tagged_smiles.add(smi)
+                print(smi,in_mol.GetTitle(), file=ofs)
+
+
+if __name__ == "__main__":
+    main(__doc__)
+
