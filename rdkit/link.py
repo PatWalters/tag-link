@@ -3,53 +3,42 @@
 """Usage: link.py --file1 FILE1 --link1 LINK1 --file2 FILE2 --link2 LINK2 --out OUTFILE
 
 --file1 FILE1 first file to be linked
---link1 LINK1 atom type in file1
+--link1 LINK1 linking SMARTS in file1
 --file2 FILE2 second file to be linked
---link2 LINK2 atom type in file2
+--link2 LINK2 linking SMARTS in file2
 --out OUTFILE output file
 """
 
 import sys
+import os
 from rdkit import Chem
 from docopt import docopt
+from tqdm import tqdm
 
 
-def tag_attached_atom(mol, qmol, map_idx):
+def map_attached_atom(in_mol, qmol, map_idx):
+    """
+    Read an input molecule, identify atoms mapped by a query molecule (SMARTS), identify the atom attaching
+    that group to the remainder of the molecule, tag the attached atom with the AtomMapNum specified by
+    map_idx, delete the atoms matched by the query
+    :param in_mol: input mmolecule
+    :param qmol: query molecule
+    :param map_idx: atom map to be assigned
+    :return: molecule with atom tagged and group matching qmol removed
+    """
+    mol = Chem.Mol(in_mol)
     match_list = mol.GetSubstructMatches(qmol)
     if len(match_list) == 0:
         return None
     for m in match_list[0]:
         atm = mol.GetAtomWithIdx(m)
         nbr_list = [x.GetOtherAtom(atm).GetIdx() for x in atm.GetBonds()]
-        not_list = [x for  x in nbr_list if x not in match_list[0]]
+        not_list = [x for x in nbr_list if x not in match_list[0]]
         if len(not_list):
-
-            attach_atm = mol.GetAtomWithIdx()
-    sys.exit(0)
-
-
-
-def map_attached_atom(mol, qmol, map_idx):
-    """
-    Assign an AtomMapNum to the atom attached to an atom adjacent to an atom with a specified atomic number
-    Also deletes the atom with the specified atomic number
-    E.g. with [Au]CCC as input generated [C:1]CC
-    :param mol: input molecule
-    :param atomic_num: atomic number of the atom to be removed
-    :param map_idx: map index to assign to the the adjacent atom
-    :return: modified molecule
-    """
-    match_list = mol.GetSubstructureMatches(qmol)
-    if len(match_list) == 0:
-        return None
-    for atm in rw_mol.GetAtoms():
-        if atm.GetAtomicNum() == atomic_num:
-            to_remove = atm.GetIdx()
-            nbr = [x.GetOtherAtom(atm) for x in atm.GetBonds()][0]
-            nbr.SetAtomMapNum(map_idx)
-    if to_remove >= 0:
-        rw_mol.RemoveAtom(to_remove)
-    return rw_mol
+            attach_idx = not_list[0]
+            attach_atm = mol.GetAtomWithIdx(attach_idx)
+            attach_atm.SetAtomMapNum(map_idx)
+    return Chem.DeleteSubstructs(mol, qmol)
 
 
 def link_molecules(in_mol_1, qmol_1, in_mol_2, qmol_2):
@@ -74,41 +63,75 @@ def link_molecules(in_mol_1, qmol_1, in_mol_2, qmol_2):
         if atm.GetAtomMapNum() == 2:
             m2 = atm.GetIdx()
             atm.SetAtomMapNum(0)
-    print(m1,m2)
     if m1 >= 0 and m2 >= 0:
         new_mol.AddBond(m1, m2, order=Chem.rdchem.BondType.SINGLE)
     return new_mol
 
 
-def get_atomic_num(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    atm = [x for x in mol.GetAtoms()][0]
-    return atm.GetAtomicNum()
+def get_supplier(file_name):
+    """
+    Get an RDKit supplier based on a file name
+    :param file_name: input file name
+    :return: supplier
+    """
+    ext = os.path.splitext(file_name)[-1]
+    try:
+        if ext == ".smi":
+            return Chem.SmilesMolSupplier(file_name)
+        elif ext == ".sdf":
+            return Chem.SDMolSupplier(file_name)
+        else:
+            print(f"{ext} is not a support input file type")
+    except FileNotFoundError:
+        print(f"Could not open {file_name}",file=sys.stderr)
+        sys.exit(1)
 
 
-mol = Chem.MolFromSmiles("CCCC(=O)O")
-query = Chem.MolFromSmarts("C(=O)O")
-tag_attached_atom(mol,query,1)
+def get_writer(file_name):
+    """
+    Get an RDKit writer based on a file name
+    :param file_name: output file name
+    :return: writer
+    """
+    ext = os.path.splitext(file_name)[-1]
+    try:
+        if ext == ".smi":
+            return Chem.SmilesWriter(file_name)
+        elif ext == ".sdf":
+            return Chem.SDWriter(file_name)
+        else:
+            print(f"{ext} is not a support input file type")
+    except FileNotFoundError:
+        print(f"Could not open {file_name}", file=sys.stderr)
+        sys.exit(1)
 
 
-#
-# if __name__ == "__main__":
-#     cmd_input = docopt(__doc__)
-#     file_name1 = cmd_input.get("--file1")
-#     file_name2 = cmd_input.get("--file2")
-#     link1 = cmd_input.get("--link1")
-#     link2 = cmd_input.get("--link2")
-#     ofs = open(cmd_input.get("--out"), "w")
-#
-#     suppl_1 = Chem.SmilesMolSupplier(file_name1)
-#     suppl_2 = Chem.SmilesMolSupplier(file_name2)
-#
-#     mol_list1 = [x for x in suppl_1]
-#     mol_list2 = [x for x in suppl_2]
-#
-#     type_1 = get_atomic_num(link1)
-#     type_2 = get_atomic_num(link2)
-#
-#     for m1 in mol_list1:
-#         for m2 in tqdm(mol_list2):
-#             print(link_molecules(m1, link1, m2, link2))
+def main(cmd_string):
+    cmd_input = docopt(cmd_string)
+    file_name1 = cmd_input.get("--file1")
+    file_name2 = cmd_input.get("--file2")
+    link1 = cmd_input.get("--link1")
+    link2 = cmd_input.get("--link2")
+    writer = get_writer(cmd_input.get("--out"))
+
+    suppl_1 = get_supplier(file_name1)
+    suppl_2 = get_supplier(file_name2)
+
+    mol_list1 = [x for x in suppl_1]
+    mol_list2 = [x for x in suppl_2]
+
+    query1 = Chem.MolFromSmarts(link1)
+    query2 = Chem.MolFromSmarts(link2)
+
+    for m1 in mol_list1:
+        name1 = m1.GetProp("_Name")
+        for m2 in tqdm(mol_list2):
+            name2 = m2.GetProp("_Name")
+            linked_mol = link_molecules(m1, query1, m2, query2)
+            Chem.SanitizeMol(linked_mol)
+            linked_mol.SetProp("_Name",name1+"_"+name2)
+            writer.write(linked_mol)
+
+
+if __name__ == "__main__":
+    main(__doc__)
